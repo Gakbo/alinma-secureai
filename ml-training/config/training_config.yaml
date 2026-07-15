@@ -1,0 +1,118 @@
+# ==========================================================================
+# Alinma SecureAI -- ML Training Configuration
+# ==========================================================================
+# Switch models, tune training, and control the pipeline WITHOUT editing
+# any Python source file. Training scripts read this file.
+#
+# Usage:
+#   python sms_model/train_transformer.py                 # uses selected_model
+#   python sms_model/train_transformer.py --model xlm_r   # override by key
+#   python sms_model/benchmark_models.py                  # trains all candidates
+# ==========================================================================
+
+# --------------------------------------------------------------------------
+# 1. TRANSFORMER MODEL REGISTRY
+# Every candidate model, selectable by key. Add new models here only.
+# --------------------------------------------------------------------------
+selected_model: xlm_r        # <- change this key to switch models
+
+models:
+  xlm_r:
+    hf_name: FacebookAI/xlm-roberta-base
+    description: >
+      XLM-RoBERTa base. Strong multilingual encoder (100 languages, 2.5TB
+      CC100). Best all-round choice for Arabic + English + code-switched SMS.
+    params_millions: 279
+    languages: [multilingual, ar, en]
+
+  mdeberta_v3:
+    hf_name: microsoft/mdeberta-v3-base
+    description: >
+      Multilingual DeBERTa v3. Disentangled attention; beats XLM-R on XNLI
+      zero-shot (+3.6%). Strong contender -- benchmark against xlm_r on
+      your data. Slightly slower per step than XLM-R.
+    params_millions: 278
+    languages: [multilingual, ar, en]
+
+  mbert:
+    hf_name: google-bert/bert-base-multilingual-cased
+    description: >
+      Multilingual BERT (104 languages). Older; generally behind XLM-R and
+      mDeBERTa on classification. Included as the classic baseline.
+    params_millions: 178
+    languages: [multilingual, ar, en]
+
+  arabert:
+    hf_name: aubmindlab/bert-base-arabertv2
+    description: >
+      AraBERT v2 -- Arabic-specialist. Strongest on pure Modern Standard
+      Arabic, but weak on English and mixed AR/EN messages. Use only if
+      your traffic is overwhelmingly Arabic-only.
+    params_millions: 136
+    languages: [ar]
+
+  marbert:
+    hf_name: UBC-NLP/MARBERTv2
+    description: >
+      MARBERT v2 -- trained on Arabic tweets incl. dialects. Better than
+      AraBERT for dialectal/social-media Arabic, still English-weak.
+    params_millions: 163
+    languages: [ar]
+
+# --------------------------------------------------------------------------
+# 2. TRAINING HYPERPARAMETERS
+# --------------------------------------------------------------------------
+training:
+  epochs: 4
+  batch_size: 16
+  gradient_accumulation_steps: 1   # raise to simulate bigger batches on small GPUs
+  learning_rate: 2.0e-5
+  warmup_ratio: 0.1                # linear warmup then decay
+  weight_decay: 0.01
+  max_length: 128                  # SMS are short; 128 tokens is plenty
+  early_stopping_patience: 2       # stop if eval F1 doesn't improve for N evals
+  fp16: auto                       # auto = use mixed precision when GPU supports it
+  seed: 42
+  eval_split: 0.2
+  metric_for_best_model: f1
+  output_dir: saved_models/transformer_sms_classifier
+
+# --------------------------------------------------------------------------
+# 3. CLASS IMBALANCE HANDLING
+# strategy: auto | class_weights | oversample | undersample | none
+# "auto" picks based on the measured imbalance ratio:
+#   < 1.5x  -> none, 1.5-4x -> class_weights, 4-10x -> class_weights,
+#   > 10x   -> oversample minority + class_weights
+# --------------------------------------------------------------------------
+imbalance:
+  strategy: auto
+
+# --------------------------------------------------------------------------
+# 4. DATA AUGMENTATION (conservative; off by default)
+# Only applied to the TRAINING split, never eval. Never replaces originals.
+# --------------------------------------------------------------------------
+augmentation:
+  enabled: false
+  techniques:                 # applied only to minority class by default
+    char_noise: true          # small typo simulation (keyboard-adjacent)
+    word_swap: true           # swap two adjacent words
+    random_deletion: false    # delete a random non-keyword token
+  max_augmented_ratio: 0.5    # cap: augmented rows <= 50% of minority size
+  minority_only: true
+
+# --------------------------------------------------------------------------
+# 5. DATASET VALIDATION
+# --------------------------------------------------------------------------
+validation:
+  fail_on_error: true         # abort training if a dataset has hard errors
+  min_rows_warning: 100       # warn if a dataset has fewer rows than this
+  report_path: saved_models/dataset_validation_report.txt
+
+# --------------------------------------------------------------------------
+# 6. BENCHMARKING
+# benchmark_models.py trains each key listed here and writes a comparison.
+# --------------------------------------------------------------------------
+benchmark:
+  candidates: [xlm_r, mdeberta_v3, mbert, arabert]
+  epochs: 2                   # shorter runs for comparison; rerun winner fully
+  report_path: saved_models/model_benchmark_report.md

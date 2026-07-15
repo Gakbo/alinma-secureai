@@ -1,0 +1,18 @@
+# Core (Models B, C + TF-IDF baseline) -- unpinned: pip picks versions
+# compatible with your Python (pins caused install failures on 3.12+).
+pandas
+numpy
+scikit-learn
+xgboost
+joblib
+pyyaml
+
+# Transformer training (train_transformer.py / benchmark_models.py only).
+# Heavy (several GB). GPU strongly recommended -- use Google Colab free tier.
+# torch  (install: pip install torch --index-url https://download.pytorch.org/whl/cu128)
+# transformers
+# datasets
+# accelerate
+# sentencepiece   # required by mdeberta_v3 tokenizer
+# protobuf        # required by mdeberta_v3 tokenizer
+# tiktoken        # required by mdeberta_v3 tokenizer

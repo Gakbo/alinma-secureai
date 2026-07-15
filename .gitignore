@@ -1,0 +1,25 @@
+@'
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+*.db
+
+# Node
+node_modules/
+dist/
+
+# ML artifacts -- trained models are large (1.1GB+); never commit them.
+# Teammates retrain, or you share the folder directly, then run
+# scripts/copy_model.ps1 to place it in the backend.
+ml-training/saved_models/
+ml-training/data/*.csv
+backend/saved_models/
+**/checkpoints/
+bert_train_checkpoints/
+
+# OS / editor
+.DS_Store
+.vscode/
+'@ | Out-File -FilePath ".gitignore" -Encoding utf8

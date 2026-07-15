@@ -1,0 +1,17 @@
+{
+  "name": "alinma-secureai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Run scripts for the Alinma SecureAI full-stack app (FastAPI backend + React frontend).",
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c blue,magenta \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:backend": "cd backend && venv\\Scripts\\python -m uvicorn app.main:app --reload",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "seed": "cd backend && venv\\Scripts\\python seed_data.py",
+    "build": "npm --prefix frontend run build",
+    "install:all": "npm install && npm --prefix frontend install && cd backend && venv\\Scripts\\python -m pip install -r requirements.txt"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
