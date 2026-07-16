@@ -4,6 +4,13 @@ sqlalchemy==2.0.35
 pydantic[email]==2.9.2
 python-jose[cryptography]==3.3.0
 passlib==1.7.4
+# bcrypt 5.x removed __about__ which passlib 1.7.4 reads -> crash on hashing.
 bcrypt==4.0.1
 python-multipart==0.0.9
 psycopg2-binary==2.9.9
+
+# SMS model (Model A). For serving, install the CPU build FIRST:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+# Plain `pip install torch` pulls the ~2.5GB CUDA wheel you don't need.
+torch
+transformers
