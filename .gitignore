@@ -22,4 +22,4 @@ bert_train_checkpoints/
 # OS / editor
 .DS_Store
 .vscode/
-'@ | Out-File -FilePath ".gitignore" -Encoding utf8
+'@ | Out-File -FilePath ".gitignore" -Encoding utf8AlinmaSecureAI-images.tar
