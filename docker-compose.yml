@@ -16,7 +16,13 @@ services:
     build: ./backend
     environment:
       DATABASE_URL: postgresql://alinma_user:alinma_pass@db:5432/alinma_secureai
+      # Demo secret. Generate a real one for any deployment:
+      #   python -c "import secrets; print(secrets.token_hex(32))"
       SECRET_KEY: change-me-for-production
+      # Mirror the local setup: trained transformer for SMS, rule engine for
+      # transactions (see README "Honest limitations" for why).
+      MODEL_BACKEND: auto
+      TXN_MODEL_BACKEND: rules
     depends_on:
       db:
         condition: service_healthy

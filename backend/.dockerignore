@@ -1,0 +1,18 @@
+# Never copy the local virtualenv -- the image builds its own deps.
+# Without this, COPY . . drags in several GB.
+venv/
+__pycache__/
+*.pyc
+
+# Secrets must NOT be baked into the image. docker-compose supplies
+# env vars at runtime instead.
+.env
+
+# Local SQLite DB -- the container uses PostgreSQL.
+*.db
+
+# Training checkpoints (not needed to serve predictions).
+**/checkpoints/
+
+# NOTE: saved_models/ is intentionally NOT ignored -- the trained
+# XLM-RoBERTa model must be inside the image for the API to serve it.

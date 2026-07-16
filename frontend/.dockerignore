@@ -1,0 +1,5 @@
+# node_modules is reinstalled inside the image; copying the host copy is
+# slow and can break (platform-specific binaries).
+node_modules/
+dist/
+.env
