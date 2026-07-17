@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas, auth
 from app.database import get_db
 from app.ml.sms_classifier import classify_sms
+from app.email_utils import send_fraud_alert_email
 
 router = APIRouter(prefix="/sms", tags=["SMS Phishing Detection"])
 
@@ -26,7 +27,8 @@ def check_sms(
     db.add(sms_log)
 
     # Auto-generate a fraud alert for high-risk messages.
-    if result.classification == "fraud":
+    fraud_detected = result.classification == "fraud"
+    if fraud_detected:
         alert = models.Alert(
             user_id=current_user.user_id,
             alert_type="sms_phishing",
@@ -40,6 +42,17 @@ def check_sms(
 
     db.commit()
     db.refresh(sms_log)
+
+    if fraud_detected:
+        try:
+            send_fraud_alert_email(
+                to_email=current_user.email,
+                customer_name=current_user.name,
+                alert_type="sms_phishing",
+                severity="high",
+            )
+        except Exception:
+            pass  # Email failure must not break the API response
 
     return schemas.SMSCheckResponse(
         sms_id=sms_log.sms_id,

@@ -37,3 +37,22 @@ def update_alert_status(
     db.commit()
     db.refresh(alert)
     return alert
+
+
+@router.post("/{alert_id}/acknowledge", response_model=schemas.AlertOut)
+def acknowledge_alert(
+    alert_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """Customers acknowledge an alert they have seen. Analysts/admins may also call this."""
+    alert = db.query(models.Alert).filter(models.Alert.alert_id == alert_id).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    # Customers may only acknowledge their own alerts
+    if current_user.role == models.UserRole.customer and alert.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorised")
+    alert.acknowledged_by_customer = True
+    db.commit()
+    db.refresh(alert)
+    return alert

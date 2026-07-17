@@ -68,3 +68,38 @@ def recent_alerts(
 ):
     alerts = db.query(models.Alert).order_by(models.Alert.created_at.desc()).limit(limit).all()
     return alerts
+
+
+@router.get("/fraud-trend")
+def fraud_trend(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role("analyst", "admin")),
+):
+    """Daily alert counts for the last 7 days (for line chart)."""
+    result = []
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    for i in range(6, -1, -1):
+        day_start = today - timedelta(days=i)
+        day_end = day_start + timedelta(days=1)
+        count = db.query(models.Alert).filter(
+            models.Alert.created_at >= day_start,
+            models.Alert.created_at < day_end,
+        ).count()
+        result.append({"date": day_start.strftime("%b %d"), "count": count})
+    return result
+
+
+@router.get("/region-stats")
+def region_stats(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.require_role("analyst", "admin")),
+):
+    """Fraud alert counts by Saudi Arabia region (stored in alert description prefix)."""
+    regions = ["Riyadh", "Jeddah", "Dammam", "Mecca", "Medina", "Abha", "Tabuk"]
+    result = []
+    for region in regions:
+        count = db.query(models.Alert).filter(
+            models.Alert.description.ilike(f"[{region}]%")
+        ).count()
+        result.append({"region": region, "count": count})
+    return result
