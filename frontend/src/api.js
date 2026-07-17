@@ -1,7 +1,6 @@
 import axios from "axios";
 
 // In dev, Vite proxies /api -> http://127.0.0.1:8000 (see vite.config.js).
-// In Docker/production, set VITE_API_URL to the backend's public URL.
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "/api",
 });
@@ -23,8 +22,27 @@ api.interceptors.response.use(
   }
 );
 
+// ---------------------------------------------------------------------------
+// JWT helpers (no library needed — just base64-decode the payload segment)
+// ---------------------------------------------------------------------------
+export function getTokenPayload() {
+  const token = localStorage.getItem("token");
+  if (!token) return null;
+  try {
+    return JSON.parse(atob(token.split(".")[1]));
+  } catch {
+    return null;
+  }
+}
+
+export function getTokenRole() {
+  return getTokenPayload()?.role || "customer";
+}
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
 export async function login(email, password) {
-  // FastAPI's OAuth2PasswordRequestForm expects form fields username/password.
   const form = new URLSearchParams();
   form.append("username", email);
   form.append("password", password);
@@ -33,28 +51,88 @@ export async function login(email, password) {
   return data;
 }
 
+export async function register(name, email, phone, password) {
+  const { data } = await api.post("/auth/register", { name, email, phone, password });
+  localStorage.setItem("token", data.access_token);
+  return data;
+}
+
 export async function getMe() {
   return (await api.get("/auth/me")).data;
 }
 
+export async function forgotPassword(email) {
+  return (await api.post("/auth/forgot-password", { email })).data;
+}
+
+export async function resetPassword(token, new_password) {
+  return (await api.post("/auth/reset-password", { token, new_password })).data;
+}
+
+// ---------------------------------------------------------------------------
+// SMS
+// ---------------------------------------------------------------------------
 export async function checkSms(message) {
   return (await api.post("/sms/check", { message })).data;
 }
 
+// ---------------------------------------------------------------------------
+// Transactions
+// ---------------------------------------------------------------------------
 export async function checkTransaction(payload) {
   return (await api.post("/transactions/check", payload)).data;
 }
 
+// ---------------------------------------------------------------------------
+// Alerts
+// ---------------------------------------------------------------------------
 export async function getAlerts() {
   return (await api.get("/alerts/")).data;
 }
 
+export async function updateAlertStatus(alertId, status) {
+  return (await api.patch(`/alerts/${alertId}`, { status })).data;
+}
+
+export async function acknowledgeAlert(alertId) {
+  return (await api.post(`/alerts/${alertId}/acknowledge`)).data;
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
 export async function getDashboardSummary() {
   return (await api.get("/dashboard/summary")).data;
 }
 
 export async function getHighRiskUsers() {
   return (await api.get("/dashboard/high-risk-users")).data;
+}
+
+export async function getFraudTrend() {
+  return (await api.get("/dashboard/fraud-trend")).data;
+}
+
+export async function getRegionStats() {
+  return (await api.get("/dashboard/region-stats")).data;
+}
+
+// ---------------------------------------------------------------------------
+// Admin
+// ---------------------------------------------------------------------------
+export async function getAdminUsers() {
+  return (await api.get("/admin/users")).data;
+}
+
+export async function updateUserRole(userId, role) {
+  return (await api.patch(`/admin/users/${userId}/role`, { role })).data;
+}
+
+// ---------------------------------------------------------------------------
+// AI Chat Assistant
+// ---------------------------------------------------------------------------
+export async function sendChatMessage(messages, lang = "en") {
+  return (await api.post("/chat/message", { messages, lang })).data;
 }
 
 export default api;
