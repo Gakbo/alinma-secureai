@@ -8,7 +8,16 @@ from pydantic import BaseModel, EmailStr, Field
 
 # ---------- Auth / Users ----------
 
+class RegisterRequest(BaseModel):
+    """Schema for self-service customer registration — no role field."""
+    name: str
+    email: EmailStr
+    phone: Optional[str] = None
+    password: str = Field(min_length=8)
+
+
 class UserCreate(BaseModel):
+    """Internal/admin schema for creating users with an explicit role."""
     name: str
     email: EmailStr
     phone: Optional[str] = None
@@ -84,6 +93,7 @@ class AlertOut(BaseModel):
     status: str
     description: Optional[str]
     created_at: datetime
+    acknowledged_by_customer: bool = False
 
     class Config:
         from_attributes = True
@@ -91,6 +101,38 @@ class AlertOut(BaseModel):
 
 class AlertStatusUpdate(BaseModel):
     status: str   # "resolved" or "open"
+
+
+# ---------- Password Reset ----------
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8)
+
+
+# ---------- Admin ----------
+
+class UserListItem(BaseModel):
+    user_id: str
+    name: str
+    email: str
+    phone: Optional[str]
+    role: str
+    risk_score: float
+    device_trust_score: float
+    scam_exposure_score: float
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RoleUpdate(BaseModel):
+    role: str   # "customer" | "analyst" | "admin"
 
 
 # ---------- Dashboard ----------

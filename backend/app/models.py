@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, String, Float, Integer, DateTime, ForeignKey, Enum, Text
+    Column, String, Float, Integer, DateTime, ForeignKey, Enum, Text, Boolean
 )
 from sqlalchemy.orm import relationship
 
@@ -57,6 +57,8 @@ class User(Base):
     scam_exposure_score = Column(Float, default=0.0)   # 0-100, higher = more exposed
 
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Incremented on every password reset so old JWTs are immediately rejected.
+    password_version = Column(Integer, default=0, nullable=False)
 
     transactions = relationship("Transaction", back_populates="user")
     sms_logs = relationship("SMSLog", back_populates="user")
@@ -122,5 +124,18 @@ class Alert(Base):
     status = Column(Enum(AlertStatus), default=AlertStatus.open)
     description = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    acknowledged_by_customer = Column(Boolean, default=False, nullable=False)
 
     user = relationship("User", back_populates="alerts")
+
+
+class PasswordReset(Base):
+    """Short-lived single-use tokens for the forgot-password flow."""
+    __tablename__ = "password_resets"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    email = Column(String, nullable=False, index=True)
+    token = Column(String, nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Integer, default=0)   # 0 = unused, 1 = used
+    created_at = Column(DateTime, default=datetime.utcnow)

@@ -61,6 +61,12 @@ def get_current_user(
     user = db.query(models.User).filter(models.User.user_id == user_id).first()
     if user is None:
         raise credentials_exception
+
+    # Reject tokens issued before a password reset (pwd_v mismatch)
+    token_pwd_v = payload.get("pwd_v", 0)
+    if token_pwd_v != (user.password_version or 0):
+        raise credentials_exception
+
     return user
 
 
