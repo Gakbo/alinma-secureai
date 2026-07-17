@@ -19,10 +19,20 @@ services:
       # Demo secret. Generate a real one for any deployment:
       #   python -c "import secrets; print(secrets.token_hex(32))"
       SECRET_KEY: change-me-for-production
-      # Mirror the local setup: trained transformer for SMS, rule engine for
-      # transactions (see README "Honest limitations" for why).
+      # SMS: transformer -> TF-IDF -> rules; transactions: model if trained.
       MODEL_BACKEND: auto
-      TXN_MODEL_BACKEND: rules
+      TXN_MODEL_BACKEND: ${TXN_MODEL_BACKEND:-auto}
+      # AI chatbot (optional — rule-based fallback answers without a key).
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # Email delivery (optional — reset links print to the backend console
+      # when unset). See docs/smtp-setup.md.
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      # Public frontend URL embedded in password-reset emails.
+      APP_URL: ${APP_URL:-http://localhost:3000}
     depends_on:
       db:
         condition: service_healthy

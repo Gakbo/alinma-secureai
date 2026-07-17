@@ -43,11 +43,16 @@ the broadest multilingual pretraining for code-switched Arabic/English.
 
 | # | Feature | Status |
 |---|---|---|
-| 1 | **SMS Scanner** — paste an Arabic/English SMS, get a risk score + plain-language reason | ✅ trained XLM-RoBERTa |
-| 2 | **Transfer Guardian** — score a transfer before it sends | ✅ explainable rule engine ([why](#honest-limitations)) |
-| 3 | **Fraud Alerts** — high-risk events auto-generate alerts | ✅ |
-| 4 | **Customer Security Score** — behaviour, device trust, scam exposure | ✅ |
-| 5 | **Analyst Dashboard** — live stats, severity/attack-type charts, high-risk customers | ✅ Chart.js |
+| 1 | **SMS Scanner** — paste an Arabic/English SMS, get a risk score + plain-language reason | ✅ 3-tier: XLM-RoBERTa → TF-IDF ML → rules |
+| 2 | **Transfer Guardian** — score a transfer before it sends | ✅ XGBoost + explainable rule layer ([caveats](#honest-limitations)) |
+| 3 | **Fraud Alerts** — high-risk events auto-generate alerts; filters, analyst resolve, customer acknowledge | ✅ persisted |
+| 4 | **Customer Security Score** — behaviour, device trust, scam exposure with animated rings, grade & recommendations | ✅ |
+| 5 | **Analyst Dashboard** — live stats, 7-day fraud trend, severity/attack-type/region charts, high-risk customers, open-alert feed | ✅ Chart.js |
+| 6 | **AI Banking Assistant** — floating chat widget; OpenAI-powered with a bilingual rule-based IVR fallback (7 topics) | ✅ works with or without an API key |
+| 7 | **Customer signup** — self-registration with server-enforced customer role and `@alinma.com` staff-domain block | ✅ |
+| 8 | **Forgot / reset password** — emailed single-use tokens, 1-hour expiry, rate limiting, old sessions invalidated | ✅ dev console fallback |
+| 9 | **Admin Panel** — user list, inline role changes, server-side domain guard | ✅ admin-only |
+| 10 | **Full English / Arabic UI** — every page, chart label, form and chatbot reply; RTL/LTR switches live | ✅ |
 
 Every risk verdict ships with a **human-readable explanation** (FR7). The model
 supplies the score; a transparent rule layer supplies the *reason*. A customer
@@ -59,17 +64,22 @@ Alinma Bank and contains an unrecognised link."*
 ## Architecture
 
 ```
-                    React + Tailwind (Axios)
+              React + Tailwind (Axios · EN/AR · RTL)
                               |
                          FastAPI + JWT
-              ┌───────────────┼───────────────┐
-              ▼               ▼               ▼
-       SMS Scanner     Transfer Guardian   Dashboard
-              |               |               |
-        XLM-RoBERTa     Rule engine      Chart.js
-              └───────► Explanation ◄────────┘
+      ┌───────────┬───────────┼───────────┬───────────┐
+      ▼           ▼           ▼           ▼           ▼
+ SMS Scanner  Transfer   Dashboard    AI Chat     Admin /
+              Guardian   + Alerts    Assistant     Auth
+      |           |           |           |           |
+ XLM-R/TF-IDF  XGBoost   Chart.js   OpenAI + IVR  bcrypt +
+   + rules    + rules                  rules     pwd_version
+      └───────────┴─► Explanation ◄┘
                               |
                     PostgreSQL / SQLite
+                              |
+                     SMTP (reset + alert emails,
+                      console fallback in dev)
 ```
 
 **Stack:** React · Tailwind · Axios · Chart.js · FastAPI · JWT · bcrypt ·
@@ -84,12 +94,19 @@ XGBoost · Docker
 AlinmaSecureAI/
 ├── backend/            FastAPI + SQLAlchemy + JWT
 │   ├── app/ml/         Model serving: score (model) + reason (rules)
-│   └── saved_models/   Trained model artifacts (gitignored, ~1.1GB)
+│   ├── app/routers/    auth · sms · transactions · alerts · dashboard · admin · chat
+│   ├── app/email_utils.py  Password-reset + fraud-alert emails (console fallback)
+│   ├── data/           Training CSVs for the quick-train script (committed)
+│   ├── tests/          pytest suites: registration, password reset, email
+│   ├── train_models.py Quick-train: TF-IDF SMS tier + XGBoost (minutes, no GPU)
+│   └── saved_models/   Trained model artifacts (gitignored, ~1.1GB transformer)
 ├── frontend/           React + Tailwind + Axios + Chart.js
-├── ml-training/        Config-driven training pipeline
+│   └── src/i18n.js     Full English/Arabic string catalogue (RTL-aware)
+├── ml-training/        Config-driven training pipeline (transformer path)
 │   ├── config/         training_config.yaml — switch models without code edits
 │   ├── sms_model/      Registry, validation, imbalance, augmentation, benchmark
 │   └── fraud_model/    XGBoost + Isolation Forest
+├── docs/smtp-setup.md  Email provider walkthroughs (Gmail / Resend)
 ├── scripts/            copy_model.ps1 — deploy a trained model to the backend
 └── docker-compose.yml  PostgreSQL + backend + frontend
 ```
@@ -106,10 +123,16 @@ cd backend
 py -3.12 -m venv venv
 .\venv\Scripts\Activate.ps1        # Linux/macOS: source venv/bin/activate
 pip install -r requirements.txt
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-python seed_data.py
+pip install torch --index-url https://download.pytorch.org/whl/cpu   # optional (transformer tier)
+python seed_data.py                # WARNING: drops + recreates all tables with demo data
+python train_models.py             # optional: trains TF-IDF SMS tier + XGBoost in ~1 min
 uvicorn app.main:app --reload
 ```
+
+Environment variables load from `backend/.env` automatically — copy
+`backend/.env.example` and edit. Everything is optional in development:
+without SMTP credentials, password-reset links print to the backend console;
+without `OPENAI_API_KEY`, the chatbot answers from its bilingual rule engine.
 
 **Frontend:**
 ```bash
@@ -122,35 +145,59 @@ Check **http://localhost:8000/** — it reports which SMS backend is live:
 ```json
 { "sms_model": { "backend": "transformer", "device": "cpu" } }
 ```
-If it says `"backend": "rules"`, the trained model is **not** loaded — see
-[Deploying a trained model](#deploying-a-trained-model).
+`"backend": "tfidf"` means the quick-trained ML tier is serving (good).
+`"backend": "rules"` means no trained model is loaded — run
+`python train_models.py`, or see
+[Deploying a trained model](#deploying-a-trained-model) for the transformer.
 
 **Demo accounts** (from `seed_data.py`):
 
 | Role | Email | Password |
 |---|---|---|
-| customer | sara.customer@example.com | Password123 |
+| customer | sara.customer@example.com (and fahad · mohammed · noura · khalid) | Password123 |
 | analyst | analyst@alinma.com | Password123 |
+| admin | admin@alinma.com | Password123 |
+
+Staff accounts must use `@alinma.com` emails; public signup is customers-only
+and the backend enforces both.
 
 **Docker:**
 ```bash
 docker compose up --build          # frontend :3000 · backend :8000 · PostgreSQL
 docker compose exec backend python seed_data.py
 ```
+Optional env vars (`OPENAI_API_KEY`, `SMTP_*`, `APP_URL`, `CORS_ORIGINS`) pass
+through `docker-compose.yml` from your shell or a repo-root `.env` file.
+
+**Tests:**
+```bash
+cd backend
+python -m pytest tests/            # 42 tests: signup, password reset, JWT invalidation, email
+```
 
 ---
 
-## Demo script (3 minutes)
+## Demo script (4 minutes)
 
-1. **Phishing SMS** — sign in as Sara → *SMS Scanner* → "Use demo phishing
-   sample" → **Fraud, 100/100**, with the reason spelled out. An alert is
-   generated automatically.
-2. **High-risk transfer** — *Transfer Guardian* → "Use demo high-risk transfer"
-   (SAR 20,000, new beneficiary, foreign destination) → **High risk, 90/100 —
-   recommend blocking.**
-3. **Explanation** — both panels answer *why*, in plain language, not just a score.
-4. **Analyst view** — sign in as the analyst → *Dashboard*: live counts, alerts
-   by severity and attack type, high-risk customers.
+1. **Phishing SMS** — sign in as Sara → *SMS Scanner* → pick a demo sample →
+   **Fraud, ~98/100**, with the reason spelled out. An alert is generated
+   automatically (and a fraud-alert email in production).
+2. **High-risk transfer** — *Transfer Guardian* → "High risk — large foreign
+   transfer" scenario → **High risk — recommend blocking.**
+3. **Ask the assistant** — open the floating chat bubble → type `2` → instant
+   guidance on spotting fake SMS. Toggle عربي: the entire app flips to Arabic
+   RTL, chatbot included.
+4. **Security Score** — Sara's live risk profile: grade, three animated ring
+   scores, targeted recommendations that react to the scans you just ran.
+5. **Acknowledge the alert** — *Fraud Alerts* → Sara acknowledges; the badge
+   survives refresh (persisted server-side).
+6. **Analyst view** — sign in as the analyst → *Dashboard*: 7-day trend,
+   severity/type/region charts, open-alert feed, high-risk customers.
+7. **Admin** — sign in as admin → *Admin Panel* → change a role inline; the
+   domain guard blocks invalid combinations server-side.
+8. **Password reset** — "Forgot your password?" → the reset link prints to the
+   backend console in dev → set a new password → old sessions are instantly
+   invalid (`password_version`).
 
 > *"Alinma SecureAI turns fraud management from reactive detection into
 > proactive prevention."*
@@ -221,13 +268,14 @@ Model artifacts are gitignored (~1.1 GB).
 
 We would rather state these than have them found:
 
-- **Transaction risk uses rules, not the trained XGBoost model.** The XGBoost
-  pipeline is built and integrated (`TXN_MODEL_BACKEND=model` enables it), but
-  it was trained on *synthetic* data generated by our own rules — so it largely
-  re-learned those rules, and its near-perfect score on that data is circular.
-  It also leans on `prior_transaction_count`, which our backend does not yet
-  track. Shipping the rule engine is the honest choice; the model swaps in the
-  moment real transaction data exists.
+- **The XGBoost transaction model was trained on synthetic data.** The full
+  pipeline (features → model → score → explanation → alert) is live — the
+  backend now feeds it the customer's real device-trust profile and stored
+  transaction-history depth — but the training data was generated by our own
+  rules, so its near-perfect AUC on that data is circular. Treat its scores as
+  a demonstration of the pipeline, not of real-world accuracy; it retrains on
+  real Alinma data with zero code changes (`python backend/train_models.py`).
+  Set `TXN_MODEL_BACKEND=rules` to force the transparent rule engine instead.
 - **The Arabic evaluation set is small** (~93 messages in the test split). The
   98.5% F1 is genuine but rests on a narrow sample. More Arabic data is our top
   priority.
@@ -236,15 +284,37 @@ We would rather state these than have them found:
 - **English data is 2011 UK generic spam**, not bank phishing — it broadens
   coverage but does not represent Saudi banking threats.
 - **Model C (Isolation Forest)** is trained but not wired into the backend.
+- **Reset-request rate limiting is in-memory** (per-process, resets on
+  restart). Fine for a single backend instance; use a shared store (Redis)
+  before scaling horizontally.
+- **The chatbot's OpenAI tier needs an `OPENAI_API_KEY`.** Without one it
+  falls back to the rule-based IVR menu — deterministic, bilingual, and free,
+  but limited to its seven scripted topics.
 
 ---
 
 ## Security
 
-bcrypt password hashing · JWT auth with role-based access
-(customer/analyst/admin) · SQLAlchemy ORM (parameterised queries → SQL
-injection protection) · secrets via environment variables (`.env`, gitignored)
-· CORS configured · HTTPS/TLS assumed at deployment.
+- **bcrypt** password hashing · **JWT** auth with role-based access
+  (customer/analyst/admin) · SQLAlchemy ORM (parameterised queries → SQL
+  injection protection) · secrets via environment variables (`.env`,
+  gitignored) · HTTPS/TLS assumed at deployment.
+- **Signup hardening** — public registration always creates a `customer`
+  account (a `role` field in the request body is ignored), and `@alinma.com`
+  addresses are rejected server-side. Staff accounts are IT-managed.
+- **Domain guard** — analyst/admin roles require an `@alinma.com` email; the
+  backend enforces this at login and on every admin role change, so a
+  manipulated frontend request cannot escalate privileges.
+- **Password reset** — 32-byte `secrets.token_urlsafe` tokens, single-use,
+  1-hour expiry, previous tokens invalidated on re-request, per-email rate
+  limiting (3 / 15 min), and a deliberately generic response so account
+  existence cannot be probed.
+- **Session invalidation** — every reset bumps the user's `password_version`;
+  JWTs carry it and tokens minted before the reset are rejected immediately.
+- **Chatbot key safety** — `OPENAI_API_KEY` lives only in the backend
+  environment; the browser never sees it.
+- **CORS** — permissive in dev; set `CORS_ORIGINS=https://your-frontend` in
+  production.
 
 > `bcrypt` is pinned to **4.0.1**: version 5.x removed the `__about__`
 > attribute that `passlib` 1.7.4 reads, causing a crash on password hashing.
