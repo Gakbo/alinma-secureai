@@ -28,6 +28,14 @@ function timeAgo(dateStr, t) {
   return `${Math.floor(hrs / 24)}${t.time_day_ago}`;
 }
 
+// Absolute local date + time, e.g. "17 Jul 2026, 14:30" (Arabic locale when AR).
+function fullDateTime(dateStr, lang) {
+  return new Date(dateStr).toLocaleString(lang === "ar" ? "ar-SA" : "en-GB", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
 export default function Alerts() {
   const { user } = useOutletContext() || {};
   const { lang, isAr } = useLanguage();
@@ -192,7 +200,8 @@ export default function Alerts() {
                   {a.description && <p className="mt-1.5 text-sm text-navy/70 leading-relaxed">{a.description}</p>}
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-xs text-navy/40">{timeAgo(a.created_at, t)}</p>
+                  <p className="text-xs font-medium text-navy/50" title={fullDateTime(a.created_at, lang)}>{timeAgo(a.created_at, t)}</p>
+                  <p className="text-[10px] text-navy/35">{fullDateTime(a.created_at, lang)}</p>
                   {isAnalyst && isOpen && (
                     <button onClick={() => resolve(a.alert_id)} disabled={resolving[a.alert_id]}
                       className="mt-2 flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50">

@@ -104,10 +104,15 @@ export default function SecurityScore() {
   const deviceTrust  = user.device_trust_score ?? 100;
   const scamExposure = user.scam_exposure_score ?? 0;
 
+  // Grade on the WORST of the three dimensions so the headline can't say
+  // "Good" while any single ring is maxed red. Device trust is inverted
+  // (low trust = high risk), so it becomes 100 - deviceTrust.
+  const worstRisk = Math.max(overallRisk, scamExposure, 100 - deviceTrust);
+
   const overallGrade =
-    overallRisk < 30 && deviceTrust > 70 && scamExposure < 30
+    worstRisk < 30
       ? { grade: "A", label: t.score_excellent, color: "text-risk-low",    bg: "bg-emerald-50 border-emerald-200" }
-      : overallRisk < 60
+      : worstRisk < 60
       ? { grade: "B", label: t.score_good,      color: "text-risk-medium", bg: "bg-amber-50 border-amber-200" }
       : { grade: "C", label: t.score_at_risk,   color: "text-risk-high",   bg: "bg-risk-high/5 border-risk-high/20" };
 

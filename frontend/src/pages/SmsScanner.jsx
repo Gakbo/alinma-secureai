@@ -19,7 +19,7 @@ const SAMPLES = [
   },
   {
     label: "✅ Legitimate transaction SMS",
-    text: "Alinma Bank: Your transfer of SAR 1,200 to Huda Al-Ansari was successful. Ref: TXN-20240715-9042. If unauthorized, call 920001234.",
+    text: "Alinma: SAR 250.00 spent on card ending 4321 at Panda, Riyadh. Balance SAR 12,340.",
   },
 ];
 
