@@ -154,10 +154,21 @@ class _FraudModel:
             "country": (country or "SA").upper(),
             "device_type": device_type or "mobile",
         }])
-        cat = self.encoder.transform(row[CATEGORICAL_COLS])
-        cat_df = pd.DataFrame(cat, columns=self.encoder.get_feature_names_out(CATEGORICAL_COLS))
-        X = pd.concat([row[NUMERIC_COLS].reset_index(drop=True),
-                       cat_df.reset_index(drop=True)], axis=1)
+        # Two training pipelines exist for this model:
+        #   * backend/train_models.py            -> OrdinalEncoder (in-place)
+        #   * ml-training/fraud_model/train_fraud_model.py -> OneHotEncoder
+        # Auto-detect the encoder type so artifacts from either pipeline load.
+        from sklearn.preprocessing import OrdinalEncoder
+        if isinstance(self.encoder, OrdinalEncoder):
+            # OrdinalEncoder replaces categoricals in-place (same column count).
+            # Feature order must match training: NUMERIC_COLS then CATEGORICAL_COLS.
+            row[CATEGORICAL_COLS] = self.encoder.transform(row[CATEGORICAL_COLS])
+            X = row[NUMERIC_COLS + CATEGORICAL_COLS]
+        else:
+            cat = self.encoder.transform(row[CATEGORICAL_COLS])
+            cat_df = pd.DataFrame(cat, columns=self.encoder.get_feature_names_out(CATEGORICAL_COLS))
+            X = pd.concat([row[NUMERIC_COLS].reset_index(drop=True),
+                           cat_df.reset_index(drop=True)], axis=1)
         return float(self.model.predict_proba(X)[0, 1])
 
 
